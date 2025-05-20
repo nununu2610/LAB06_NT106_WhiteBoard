@@ -28,6 +28,7 @@
         /// </summary>
         private void InitializeComponent()
         {
+            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(ClientForm));
             this.panelWhiteboard = new System.Windows.Forms.Panel();
             this.numericUpDownThickness = new System.Windows.Forms.NumericUpDown();
             this.buttonEnd = new System.Windows.Forms.Button();
@@ -47,16 +48,17 @@
             // 
             // numericUpDownThickness
             // 
-            this.numericUpDownThickness.Location = new System.Drawing.Point(140, 402);
+            this.numericUpDownThickness.Font = new System.Drawing.Font("Segoe UI Semibold", 12F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.numericUpDownThickness.Location = new System.Drawing.Point(475, 397);
             this.numericUpDownThickness.Name = "numericUpDownThickness";
-            this.numericUpDownThickness.Size = new System.Drawing.Size(96, 22);
+            this.numericUpDownThickness.Size = new System.Drawing.Size(96, 34);
             this.numericUpDownThickness.TabIndex = 2;
             // 
             // buttonEnd
             // 
             this.buttonEnd.Font = new System.Drawing.Font("Segoe UI", 10.8F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.buttonEnd.ForeColor = System.Drawing.Color.DarkGreen;
-            this.buttonEnd.Location = new System.Drawing.Point(722, 434);
+            this.buttonEnd.Location = new System.Drawing.Point(739, 451);
             this.buttonEnd.Name = "buttonEnd";
             this.buttonEnd.Size = new System.Drawing.Size(105, 39);
             this.buttonEnd.TabIndex = 3;
@@ -68,7 +70,7 @@
             // 
             this.btnChooseColor.Font = new System.Drawing.Font("Segoe UI Black", 10.2F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.btnChooseColor.ForeColor = System.Drawing.Color.Navy;
-            this.btnChooseColor.Location = new System.Drawing.Point(46, 394);
+            this.btnChooseColor.Location = new System.Drawing.Point(322, 394);
             this.btnChooseColor.Name = "btnChooseColor";
             this.btnChooseColor.Size = new System.Drawing.Size(88, 42);
             this.btnChooseColor.TabIndex = 5;
@@ -79,7 +81,7 @@
             // txtImageUrl
             // 
             this.txtImageUrl.Font = new System.Drawing.Font("Microsoft Sans Serif", 10.2F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.txtImageUrl.Location = new System.Drawing.Point(216, 442);
+            this.txtImageUrl.Location = new System.Drawing.Point(233, 459);
             this.txtImageUrl.Name = "txtImageUrl";
             this.txtImageUrl.Size = new System.Drawing.Size(355, 27);
             this.txtImageUrl.TabIndex = 6;
@@ -88,7 +90,7 @@
             // 
             this.btnInsertImage.Font = new System.Drawing.Font("Segoe UI", 10.8F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.btnInsertImage.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(192)))), ((int)(((byte)(0)))), ((int)(((byte)(0)))));
-            this.btnInsertImage.Location = new System.Drawing.Point(589, 434);
+            this.btnInsertImage.Location = new System.Drawing.Point(606, 451);
             this.btnInsertImage.Name = "btnInsertImage";
             this.btnInsertImage.Size = new System.Drawing.Size(111, 39);
             this.btnInsertImage.TabIndex = 7;
@@ -101,7 +103,7 @@
             this.label2.AutoSize = true;
             this.label2.Font = new System.Drawing.Font("Segoe UI Black", 12F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.label2.ForeColor = System.Drawing.Color.Navy;
-            this.label2.Location = new System.Drawing.Point(12, 442);
+            this.label2.Location = new System.Drawing.Point(29, 459);
             this.label2.Name = "label2";
             this.label2.Size = new System.Drawing.Size(183, 28);
             this.label2.TabIndex = 8;
@@ -111,6 +113,7 @@
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+            this.BackgroundImage = ((System.Drawing.Image)(resources.GetObject("$this.BackgroundImage")));
             this.ClientSize = new System.Drawing.Size(886, 508);
             this.Controls.Add(this.label2);
             this.Controls.Add(this.btnInsertImage);
@@ -119,8 +122,9 @@
             this.Controls.Add(this.buttonEnd);
             this.Controls.Add(this.numericUpDownThickness);
             this.Controls.Add(this.panelWhiteboard);
+            this.DoubleBuffered = true;
             this.Name = "ClientForm";
-            this.Text = "s";
+            this.Text = "DrawingPannel";
             ((System.ComponentModel.ISupportInitialize)(this.numericUpDownThickness)).EndInit();
             this.ResumeLayout(false);
             this.PerformLayout();
