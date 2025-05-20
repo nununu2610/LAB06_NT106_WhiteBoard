@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Net;
+using System.Net.Mail;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
+
 
 class Server
 {
@@ -12,6 +14,9 @@ class Server
     private int port = 9000;
     private readonly object _lock = new object();
     private const int maxClients = 5;
+
+    // Lưu lịch sử các message (DRAW;..., IMAGE;...)
+    private List<string> whiteboardHistory = new List<string>();
 
     public void Start()
     {
@@ -31,15 +36,22 @@ class Server
             {
                 if (clients.Count >= maxClients)
                 {
-                    // Quá giới hạn, đóng kết nối client mới
                     Console.WriteLine("Client rejected - max clients reached");
                     client.Close();
                     continue;
                 }
+
                 clients.Add(client);
                 Console.WriteLine("Client connected. Total clients: " + clients.Count);
 
-                // TODO: Gửi email cảnh báo nếu clients.Count == maxClients
+                // Gửi email cảnh báo khi đủ maxClients
+                if (clients.Count == maxClients)
+                {
+                    SendAlertEmail();
+                }
+
+                // Gửi lại lịch sử whiteboard cho client mới
+                SendHistoryToClient(client);
             }
 
             Thread clientThread = new Thread(HandleClient);
@@ -53,6 +65,7 @@ class Server
         TcpClient client = (TcpClient)obj;
         NetworkStream stream = client.GetStream();
         byte[] buffer = new byte[4096];
+        StringBuilder sb = new StringBuilder();
 
         try
         {
@@ -61,12 +74,34 @@ class Server
                 int bytesRead = stream.Read(buffer, 0, buffer.Length);
                 if (bytesRead == 0) break; // client ngắt kết nối
 
-                string message = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+                string chunk = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+                sb.Append(chunk);
 
-                Console.WriteLine("Received: " + message);
+                string allData = sb.ToString();
+                int newlineIndex;
+                while ((newlineIndex = allData.IndexOf('\n')) >= 0)
+                {
+                    string message = allData.Substring(0, newlineIndex).Trim();
+                    if (!string.IsNullOrEmpty(message))
+                    {
+                        Console.WriteLine("Received: " + message);
 
-                // Phát lại message cho các client khác
-                Broadcast(message, client);
+                        lock (_lock)
+                        {
+                            // Lưu lại lịch sử (chỉ DRAW và IMAGE)
+                            if (message.StartsWith("DRAW") || message.StartsWith("IMAGE"))
+                            {
+                                whiteboardHistory.Add(message);
+                            }
+                        }
+
+                        // Phát lại message cho các client khác
+                        Broadcast(message, client);
+                    }
+                    allData = allData.Substring(newlineIndex + 1);
+                }
+                sb.Clear();
+                sb.Append(allData);
             }
         }
         catch (Exception ex)
@@ -120,6 +155,56 @@ class Server
             }
         }
     }
+
+    private void SendHistoryToClient(TcpClient client)
+    {
+        try
+        {
+            NetworkStream stream = client.GetStream();
+            foreach (string msg in whiteboardHistory)
+            {
+                byte[] data = Encoding.UTF8.GetBytes(msg + "\n");
+                stream.Write(data, 0, data.Length);
+                stream.Flush();
+                Thread.Sleep(1); // Delay nhỏ để tránh quá tải mạng
+            }
+            Console.WriteLine("Sent whiteboard history to new client.");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Lỗi khi gửi lịch sử cho client mới: " + ex.Message);
+        }
+    }
+
+    private void SendAlertEmail()
+    {
+        try
+        {
+            MailMessage mail = new MailMessage();
+            mail.From = new MailAddress("nnhu7732@NhomNN.nt106"); // Email hợp lệ
+            mail.To.Add("nnhu7732@NhomNN.nt106"); // Người nhận
+            mail.Subject = "Cảnh báo: Đã có đủ 5 Client kết nối";
+            mail.Body = "Hiện tại Server đã có 5 Client đang hoạt dộng";
+
+            SmtpClient smtp = new SmtpClient("192.168.102.93", 587); // port 587 thường dùng
+            smtp.Credentials = new NetworkCredential("nnhu7732@NhomNN.nt106", "Nt106Uit@@");
+            smtp.EnableSsl = true; // Nếu server hỗ trợ SSL/TLS
+
+            // Bỏ qua lỗi chứng chỉ (chỉ test, không dùng trong production)
+            System.Net.ServicePointManager.ServerCertificateValidationCallback =
+                (sender, certificate, chain, sslPolicyErrors) => true;
+
+            smtp.Send(mail);
+            Console.WriteLine("Gửi mail cảnh báo tới quản trị viên thành công");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Lỗi khi gửi email: " + ex.Message);
+            if (ex.InnerException != null)
+                Console.WriteLine("Inner Exception: " + ex.InnerException.Message);
+        }
+    }
+
 
 
     static void Main()

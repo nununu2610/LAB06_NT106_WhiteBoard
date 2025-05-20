@@ -29,64 +29,95 @@
         private void InitializeComponent()
         {
             this.panelWhiteboard = new System.Windows.Forms.Panel();
-            this.comboBoxColor = new System.Windows.Forms.ComboBox();
             this.numericUpDownThickness = new System.Windows.Forms.NumericUpDown();
             this.buttonEnd = new System.Windows.Forms.Button();
-            this.label1 = new System.Windows.Forms.Label();
+            this.btnChooseColor = new System.Windows.Forms.Button();
+            this.txtImageUrl = new System.Windows.Forms.TextBox();
+            this.btnInsertImage = new System.Windows.Forms.Button();
+            this.label2 = new System.Windows.Forms.Label();
             ((System.ComponentModel.ISupportInitialize)(this.numericUpDownThickness)).BeginInit();
             this.SuspendLayout();
             // 
             // panelWhiteboard
             // 
-            this.panelWhiteboard.Location = new System.Drawing.Point(55, 26);
+            this.panelWhiteboard.Location = new System.Drawing.Point(17, 26);
             this.panelWhiteboard.Name = "panelWhiteboard";
-            this.panelWhiteboard.Size = new System.Drawing.Size(753, 278);
+            this.panelWhiteboard.Size = new System.Drawing.Size(857, 362);
             this.panelWhiteboard.TabIndex = 0;
-            this.panelWhiteboard.Paint += new System.Windows.Forms.PaintEventHandler(this.panelWhiteboard_Paint);
-            // 
-            // comboBoxColor
-            // 
-            this.comboBoxColor.FormattingEnabled = true;
-            this.comboBoxColor.Location = new System.Drawing.Point(55, 330);
-            this.comboBoxColor.Name = "comboBoxColor";
-            this.comboBoxColor.Size = new System.Drawing.Size(619, 24);
-            this.comboBoxColor.TabIndex = 1;
             // 
             // numericUpDownThickness
             // 
-            this.numericUpDownThickness.Location = new System.Drawing.Point(55, 397);
+            this.numericUpDownThickness.Location = new System.Drawing.Point(140, 402);
             this.numericUpDownThickness.Name = "numericUpDownThickness";
-            this.numericUpDownThickness.Size = new System.Drawing.Size(142, 22);
+            this.numericUpDownThickness.Size = new System.Drawing.Size(96, 22);
             this.numericUpDownThickness.TabIndex = 2;
             // 
             // buttonEnd
             // 
-            this.buttonEnd.Location = new System.Drawing.Point(637, 408);
+            this.buttonEnd.Font = new System.Drawing.Font("Segoe UI", 10.8F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.buttonEnd.ForeColor = System.Drawing.Color.DarkGreen;
+            this.buttonEnd.Location = new System.Drawing.Point(722, 434);
             this.buttonEnd.Name = "buttonEnd";
-            this.buttonEnd.Size = new System.Drawing.Size(198, 76);
+            this.buttonEnd.Size = new System.Drawing.Size(105, 39);
             this.buttonEnd.TabIndex = 3;
-            this.buttonEnd.Text = "button1";
+            this.buttonEnd.Text = "SAVE";
             this.buttonEnd.UseVisualStyleBackColor = true;
             this.buttonEnd.Click += new System.EventHandler(this.buttonEnd_Click);
             // 
-            // label1
+            // btnChooseColor
             // 
-            this.label1.AutoSize = true;
-            this.label1.Location = new System.Drawing.Point(814, 26);
-            this.label1.Name = "label1";
-            this.label1.Size = new System.Drawing.Size(44, 16);
-            this.label1.TabIndex = 4;
-            this.label1.Text = "label1";
+            this.btnChooseColor.Font = new System.Drawing.Font("Segoe UI Black", 10.2F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.btnChooseColor.ForeColor = System.Drawing.Color.Navy;
+            this.btnChooseColor.Location = new System.Drawing.Point(46, 394);
+            this.btnChooseColor.Name = "btnChooseColor";
+            this.btnChooseColor.Size = new System.Drawing.Size(88, 42);
+            this.btnChooseColor.TabIndex = 5;
+            this.btnChooseColor.Text = "COLOR";
+            this.btnChooseColor.UseVisualStyleBackColor = true;
+            this.btnChooseColor.Click += new System.EventHandler(this.btnChooseColor_Click);
+            // 
+            // txtImageUrl
+            // 
+            this.txtImageUrl.Font = new System.Drawing.Font("Microsoft Sans Serif", 10.2F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.txtImageUrl.Location = new System.Drawing.Point(216, 442);
+            this.txtImageUrl.Name = "txtImageUrl";
+            this.txtImageUrl.Size = new System.Drawing.Size(355, 27);
+            this.txtImageUrl.TabIndex = 6;
+            // 
+            // btnInsertImage
+            // 
+            this.btnInsertImage.Font = new System.Drawing.Font("Segoe UI", 10.8F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.btnInsertImage.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(192)))), ((int)(((byte)(0)))), ((int)(((byte)(0)))));
+            this.btnInsertImage.Location = new System.Drawing.Point(589, 434);
+            this.btnInsertImage.Name = "btnInsertImage";
+            this.btnInsertImage.Size = new System.Drawing.Size(111, 39);
+            this.btnInsertImage.TabIndex = 7;
+            this.btnInsertImage.Text = "INSERT";
+            this.btnInsertImage.UseVisualStyleBackColor = true;
+            this.btnInsertImage.Click += new System.EventHandler(this.btnInsertImage_Click);
+            // 
+            // label2
+            // 
+            this.label2.AutoSize = true;
+            this.label2.Font = new System.Drawing.Font("Segoe UI Black", 12F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.label2.ForeColor = System.Drawing.Color.Navy;
+            this.label2.Location = new System.Drawing.Point(12, 442);
+            this.label2.Name = "label2";
+            this.label2.Size = new System.Drawing.Size(183, 28);
+            this.label2.TabIndex = 8;
+            this.label2.Text = "Enter Image URL:";
             // 
             // ClientForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(886, 508);
-            this.Controls.Add(this.label1);
+            this.Controls.Add(this.label2);
+            this.Controls.Add(this.btnInsertImage);
+            this.Controls.Add(this.txtImageUrl);
+            this.Controls.Add(this.btnChooseColor);
             this.Controls.Add(this.buttonEnd);
             this.Controls.Add(this.numericUpDownThickness);
-            this.Controls.Add(this.comboBoxColor);
             this.Controls.Add(this.panelWhiteboard);
             this.Name = "ClientForm";
             this.Text = "s";
@@ -99,10 +130,12 @@
         #endregion
 
         private System.Windows.Forms.Panel panelWhiteboard;
-        private System.Windows.Forms.ComboBox comboBoxColor;
         private System.Windows.Forms.NumericUpDown numericUpDownThickness;
         private System.Windows.Forms.Button buttonEnd;
-        private System.Windows.Forms.Label label1;
+        private System.Windows.Forms.Button btnChooseColor;
+        private System.Windows.Forms.TextBox txtImageUrl;
+        private System.Windows.Forms.Button btnInsertImage;
+        private System.Windows.Forms.Label label2;
     }
 }
 

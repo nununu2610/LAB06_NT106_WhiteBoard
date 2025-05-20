@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Drawing;
 using System.IO;
+using System.Net.Http;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace Client
@@ -12,21 +14,31 @@ namespace Client
     {
         private TcpClient client;
         private NetworkStream stream;
-
         private bool isDrawing = false;
         private Point lastPoint;
 
         private Bitmap drawingBitmap;
         private Graphics graphics;
 
-        private Color penColor = Color.Black;
+        private Color currentColor = Color.Black;
         private int penThickness = 2;
+
+        private Image currentImage = null;
+        private Rectangle currentImageRect = Rectangle.Empty;
+        private bool isMovingImage = false;
+        private bool isResizingImage = false;
+        private Point mouseDownPos;
+        private Point imageMoveStartPos;
+        private Point resizeStartPos;
+
+        private const int resizeHandleSize = 10;
+        private const int MaxImageWidth = 200;
+        private const int MaxImageHeight = 200;
 
         public ClientForm()
         {
             InitializeComponent();
 
-            // Khởi tạo bitmap và graphics để vẽ lên panel
             drawingBitmap = new Bitmap(panelWhiteboard.Width, panelWhiteboard.Height);
             graphics = Graphics.FromImage(drawingBitmap);
             graphics.Clear(Color.White);
@@ -34,24 +46,20 @@ namespace Client
             panelWhiteboard.BackgroundImage = drawingBitmap;
             panelWhiteboard.BackgroundImageLayout = ImageLayout.None;
 
-            // Kết nối server
             ConnectToServer();
-
-            // Thiết lập các lựa chọn màu sắc, độ dày
-            comboBoxColor.Items.AddRange(new string[] { "Black", "Red", "Green", "Blue" });
-            comboBoxColor.SelectedIndex = 0;
 
             numericUpDownThickness.Minimum = 1;
             numericUpDownThickness.Maximum = 10;
             numericUpDownThickness.Value = 2;
-
-            comboBoxColor.SelectedIndexChanged += ComboBoxColor_SelectedIndexChanged;
             numericUpDownThickness.ValueChanged += NumericUpDownThickness_ValueChanged;
 
-            // Gán sự kiện chuột cho panel vẽ
             panelWhiteboard.MouseDown += PanelWhiteboard_MouseDown;
             panelWhiteboard.MouseMove += PanelWhiteboard_MouseMove;
             panelWhiteboard.MouseUp += PanelWhiteboard_MouseUp;
+
+            btnInsertImage.Click += btnInsertImage_Click;
+            buttonEnd.Click += buttonEnd_Click;
+            btnChooseColor.Click += btnChooseColor_Click;
         }
 
         private void ConnectToServer()
@@ -67,7 +75,7 @@ namespace Client
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Không kết nối được tới server: " + ex.Message);
+                MessageBox.Show("Cannot connect to server: " + ex.Message);
                 Environment.Exit(0);
             }
         }
@@ -108,112 +116,248 @@ namespace Client
 
             this.Invoke(new Action(() =>
             {
-                MessageBox.Show("Đã mất kết nối tới server.");
+                MessageBox.Show("Lost connection to server.");
                 Application.Exit();
             }));
         }
 
-
         private void ProcessDrawingMessage(string msg)
         {
-            if (!msg.StartsWith("DRAW")) return;
-
-            string[] parts = msg.Split(';');
-            if (parts.Length != 7) return;
-
-            if (int.TryParse(parts[1], out int x1) &&
-                int.TryParse(parts[2], out int y1) &&
-                int.TryParse(parts[3], out int x2) &&
-                int.TryParse(parts[4], out int y2) &&
-                int.TryParse(parts[6], out int thickness))
+            if (msg.StartsWith("DRAW"))
             {
-                Color color;
-                try
-                {
-                    color = Color.FromName(parts[5]);
-                }
-                catch
-                {
-                    color = Color.Black; // Default color if parsing fails
-                }
+                string[] parts = msg.Split(';');
+                if (parts.Length != 7) return;
 
-                if (panelWhiteboard.InvokeRequired)
+                if (int.TryParse(parts[1], out int x1) &&
+                    int.TryParse(parts[2], out int y1) &&
+                    int.TryParse(parts[3], out int x2) &&
+                    int.TryParse(parts[4], out int y2) &&
+                    int.TryParse(parts[5], out int thickness) &&
+                    int.TryParse(parts[6], out int argb))
                 {
-                    panelWhiteboard.Invoke(new Action(() =>
+                    Color c = Color.FromArgb(argb);
+                    lock (drawingBitmap)
                     {
-                        using (Pen pen = new Pen(color, thickness))
+                        using (Graphics g = Graphics.FromImage(drawingBitmap))
                         {
-                            graphics.DrawLine(pen, x1, y1, x2, y2);
+                            using (Pen p = new Pen(c, thickness))
+                            {
+                                g.DrawLine(p, x1, y1, x2, y2);
+                            }
                         }
-                        panelWhiteboard.Invalidate();
-                    }));
-                }
-                else
-                {
-                    using (Pen pen = new Pen(color, thickness))
-                    {
-                        graphics.DrawLine(pen, x1, y1, x2, y2);
                     }
-                    panelWhiteboard.Invalidate();
+                    panelWhiteboard.Invoke(new Action(() => panelWhiteboard.Invalidate()));
+                }
+            }
+            else if (msg.StartsWith("IMAGE"))
+            {
+                string[] parts = msg.Split(';');
+                if (parts.Length < 6) return;
+
+                if (int.TryParse(parts[1], out int x) &&
+                    int.TryParse(parts[2], out int y) &&
+                    int.TryParse(parts[3], out int w) &&
+                    int.TryParse(parts[4], out int h))
+                {
+                    string base64Image = msg.Substring(msg.IndexOf(parts[5]));
+                    try
+                    {
+                        byte[] imgBytes = Convert.FromBase64String(base64Image);
+                        using (MemoryStream ms = new MemoryStream(imgBytes))
+                        {
+                            Image img = Image.FromStream(ms);
+                            lock (drawingBitmap)
+                            {
+                                using (Graphics g = Graphics.FromImage(drawingBitmap))
+                                {
+                                    g.DrawImage(img, new Rectangle(x, y, w, h));
+                                }
+                            }
+                            panelWhiteboard.Invoke(new Action(() => panelWhiteboard.Invalidate()));
+                        }
+                    }
+                    catch { }
                 }
             }
         }
 
-        private void PanelWhiteboard_MouseDown(object sender, MouseEventArgs e)
-        {
-            isDrawing = true;
-            lastPoint = e.Location;
-        }
-
-        private void PanelWhiteboard_MouseMove(object sender, MouseEventArgs e)
-        {
-            if (!isDrawing) return;
-
-            Point currentPoint = e.Location;
-
-            using (Pen pen = new Pen(penColor, penThickness))
-            {
-                graphics.DrawLine(pen, lastPoint, currentPoint);
-            }
-            panelWhiteboard.Invalidate();
-
-            // Gửi dữ liệu vẽ cho server
-            string message = $"DRAW;{lastPoint.X};{lastPoint.Y};{currentPoint.X};{currentPoint.Y};{penColor.Name};{penThickness}";
-            SendMessage(message);
-
-            // Comment tạm dòng gửi message cho server
-            // string message = $"DRAW;{lastPoint.X};{lastPoint.Y};{currentPoint.X};{currentPoint.Y};{penColor.Name};{penThickness}";
-            // SendMessage(message);
-
-            lastPoint = currentPoint;
-        }
-
-        private void PanelWhiteboard_MouseUp(object sender, MouseEventArgs e)
-        {
-            isDrawing = false;
-        }
-
-        private void SendMessage(string message)
+        private void SendMessage(string msg)
         {
             try
             {
-                if (client != null && client.Connected && stream != null && stream.CanWrite)
+                if (stream != null && stream.CanWrite)
                 {
-                    byte[] data = Encoding.UTF8.GetBytes(message + "\n");
+                    byte[] data = Encoding.UTF8.GetBytes(msg + "\n");
                     stream.Write(data, 0, data.Length);
                     stream.Flush();
                 }
             }
-            catch (Exception ex)
+            catch { }
+        }
+
+        private void PanelWhiteboard_MouseDown(object sender, MouseEventArgs e)
+        {
+            if (IsNearResizeHandle(e.Location))
             {
-                Console.WriteLine($"Send error: {ex.Message}");
-                // Handle reconnect if needed
+                isResizingImage = true;
+                resizeStartPos = e.Location;
+            }
+            else if (currentImageRect.Contains(e.Location))
+            {
+                isMovingImage = true;
+                mouseDownPos = e.Location;
+                imageMoveStartPos = new Point(currentImageRect.X, currentImageRect.Y);
+            }
+            else
+            {
+                isDrawing = true;
+                lastPoint = e.Location;
             }
         }
 
-        private void ComboBoxColor_SelectedIndexChanged(object sender, EventArgs e)
+        private void PanelWhiteboard_MouseMove(object sender, MouseEventArgs e)
         {
-            penColor = Color.FromName(comboBoxColor.SelectedItem.ToString());
+            if (isResizingImage)
+            {
+                int dx = e.X - resizeStartPos.X;
+                int dy = e.Y - resizeStartPos.Y;
+                currentImageRect.Width = Math.Max(20, currentImageRect.Width + dx);
+                currentImageRect.Height = Math.Max(20, currentImageRect.Height + dy);
+                resizeStartPos = e.Location;
+                RedrawWhiteboard();
+            }
+            else if (isMovingImage)
+            {
+                int dx = e.X - mouseDownPos.X;
+                int dy = e.Y - mouseDownPos.Y;
+                currentImageRect.X = imageMoveStartPos.X + dx;
+                currentImageRect.Y = imageMoveStartPos.Y + dy;
+                RedrawWhiteboard();
+            }
+            else if (isDrawing)
+            {
+                using (Graphics g = Graphics.FromImage(drawingBitmap))
+                {
+                    using (Pen pen = new Pen(currentColor, penThickness))
+                    {
+                        g.DrawLine(pen, lastPoint, e.Location);
+                    }
+                }
+                SendMessage($"DRAW;{lastPoint.X};{lastPoint.Y};{e.X};{e.Y};{penThickness};{currentColor.ToArgb()}");
+                lastPoint = e.Location;
+                panelWhiteboard.Invalidate();
+            }
+        }
+
+        private void PanelWhiteboard_MouseUp(object sender, MouseEventArgs e)
+        {
+            if (isDrawing) isDrawing = false;
+            if (isMovingImage)
+            {
+                isMovingImage = false;
+                SendCurrentImagePosition();
+            }
+            if (isResizingImage)
+            {
+                isResizingImage = false;
+                SendCurrentImagePosition();
+            }
+        }
+
+        private bool IsNearResizeHandle(Point pt)
+        {
+            Rectangle handle = new Rectangle(
+                currentImageRect.Right - resizeHandleSize,
+                currentImageRect.Bottom - resizeHandleSize,
+                resizeHandleSize, resizeHandleSize);
+            return handle.Contains(pt);
+        }
+
+        private async void btnInsertImage_Click(object sender, EventArgs e)
+        {
+            string url = txtImageUrl.Text.Trim();
+            if (string.IsNullOrEmpty(url))
+            {
+                MessageBox.Show("Vui lòng nhập URL ảnh");
+                return;
+            }
+
+            try
+            {
+                Image img = await LoadImageFromUrl(url);
+                if (img == null)
+                {
+                    MessageBox.Show("Không tải được ảnh từ URL");
+                    return;
+                }
+
+                Size newSize = ResizeToFit(img.Size, MaxImageWidth, MaxImageHeight);
+                Bitmap resizedImage = new Bitmap(img, newSize);
+                currentImage = resizedImage;
+                currentImageRect = new Rectangle(50, 50, resizedImage.Width, resizedImage.Height);
+
+                RedrawWhiteboard();
+                SendCurrentImagePosition();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Lỗi tải ảnh: " + ex.Message);
+            }
+        }
+
+        private Size ResizeToFit(Size original, int maxWidth, int maxHeight)
+        {
+            float ratioX = (float)maxWidth / original.Width;
+            float ratioY = (float)maxHeight / original.Height;
+            float ratio = Math.Min(ratioX, ratioY);
+            return new Size((int)(original.Width * ratio), (int)(original.Height * ratio));
+        }
+
+        private async Task<Image> LoadImageFromUrl(string url)
+        {
+            using (HttpClient http = new HttpClient())
+            {
+                var response = await http.GetAsync(url);
+                if (!response.IsSuccessStatusCode) return null;
+                using (var stream = await response.Content.ReadAsStreamAsync())
+                {
+                    return Image.FromStream(stream);
+                }
+            }
+        }
+
+        private void RedrawWhiteboard()
+        {
+            lock (drawingBitmap)
+            {
+                graphics.Clear(Color.White);
+                if (currentImage != null && currentImageRect != Rectangle.Empty)
+                {
+                    graphics.DrawImage(currentImage, currentImageRect);
+                    graphics.FillRectangle(Brushes.Gray,
+                        currentImageRect.Right - resizeHandleSize,
+                        currentImageRect.Bottom - resizeHandleSize,
+                        resizeHandleSize, resizeHandleSize);
+                }
+            }
+            panelWhiteboard.Invalidate();
+        }
+
+        private void SendCurrentImagePosition()
+        {
+            if (currentImage == null || currentImageRect == Rectangle.Empty) return;
+            try
+            {
+                string base64;
+                using (MemoryStream ms = new MemoryStream())
+                {
+                    currentImage.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
+                    base64 = Convert.ToBase64String(ms.ToArray());
+                }
+                string msg = $"IMAGE;{currentImageRect.X};{currentImageRect.Y};{currentImageRect.Width};{currentImageRect.Height};{base64}";
+                SendMessage(msg);
+            }
+            catch { }
         }
 
         private void NumericUpDownThickness_ValueChanged(object sender, EventArgs e)
@@ -221,45 +365,19 @@ namespace Client
             penThickness = (int)numericUpDownThickness.Value;
         }
 
+        private void btnChooseColor_Click(object sender, EventArgs e)
+        {
+            ColorDialog dlg = new ColorDialog();
+            if (dlg.ShowDialog() == DialogResult.OK)
+            {
+                currentColor = dlg.Color;
+            }
+        }
+
         private void buttonEnd_Click(object sender, EventArgs e)
         {
-            SaveWhiteboardImage();
+            client?.Close();
             Application.Exit();
-        }
-        private void SaveWhiteboardImage()
-        {
-            try
-            {
-                // Lấy đường dẫn thư mục chứa ứng dụng
-                string appDirectory = AppDomain.CurrentDomain.BaseDirectory;
-
-                // Đi đến thư mục cha của client (giả sử client là thư mục chứa exe)
-                string solutionDirectory = Directory.GetParent(appDirectory).Parent.FullName;
-
-                // Kết hợp với thư mục Pictures
-                string picturesPath = Path.Combine(solutionDirectory, "Pictures");
-
-                // Phần còn lại giống như trên
-                if (!Directory.Exists(picturesPath))
-                {
-                    Directory.CreateDirectory(picturesPath);
-                }
-
-                string fileName = $"Whiteboard_{DateTime.Now:yyyyMMdd_HHmmss}.png";
-                string fullPath = Path.Combine(picturesPath, fileName);
-
-                drawingBitmap.Save(fullPath, System.Drawing.Imaging.ImageFormat.Png);
-
-                MessageBox.Show($"Đã lưu ảnh thành công tại:\n{fullPath}");
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Lỗi khi lưu ảnh:\n{ex.Message}");
-            }
-        }
-        private void panelWhiteboard_Paint(object sender, PaintEventArgs e)
-        {
-
         }
     }
 }
