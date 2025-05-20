@@ -226,39 +226,37 @@ namespace Client
             SaveWhiteboardImage();
             Application.Exit();
         }
-
         private void SaveWhiteboardImage()
         {
             try
             {
-                // Tạo đường dẫn thư mục
-                string directoryPath = @"C:\Users\ACER\Downloads\NT106\Lab06\Pictures";
+                // Lấy đường dẫn thư mục chứa ứng dụng
+                string appDirectory = AppDomain.CurrentDomain.BaseDirectory;
 
-                // Đảm bảo thư mục tồn tại, nếu không thì tạo mới
-                if (!Directory.Exists(directoryPath))
+                // Đi đến thư mục cha của client (giả sử client là thư mục chứa exe)
+                string solutionDirectory = Directory.GetParent(appDirectory).Parent.FullName;
+
+                // Kết hợp với thư mục Pictures
+                string picturesPath = Path.Combine(solutionDirectory, "Pictures");
+
+                // Phần còn lại giống như trên
+                if (!Directory.Exists(picturesPath))
                 {
-                    Directory.CreateDirectory(directoryPath);
+                    Directory.CreateDirectory(picturesPath);
                 }
 
-                // Tạo tên file với timestamp
                 string fileName = $"Whiteboard_{DateTime.Now:yyyyMMdd_HHmmss}.png";
-                string fullPath = Path.Combine(directoryPath, fileName);
+                string fullPath = Path.Combine(picturesPath, fileName);
 
-                // Lưu ảnh
                 drawingBitmap.Save(fullPath, System.Drawing.Imaging.ImageFormat.Png);
 
-                MessageBox.Show($"Đã lưu ảnh thành công tại:\n{fullPath}", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            }
-            catch (UnauthorizedAccessException)
-            {
-                MessageBox.Show("Lỗi: Không có quyền truy cập thư mục đích.", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show($"Đã lưu ảnh thành công tại:\n{fullPath}");
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Lỗi khi lưu ảnh:\n{ex.Message}", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show($"Lỗi khi lưu ảnh:\n{ex.Message}");
             }
         }
-
         private void panelWhiteboard_Paint(object sender, PaintEventArgs e)
         {
 
