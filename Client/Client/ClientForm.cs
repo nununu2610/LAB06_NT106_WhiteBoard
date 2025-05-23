@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Net.Http;
@@ -8,17 +9,49 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
+enum DrawingMode
+{
+    FreeHand,
+    Rectangle,
+    Ellipse,
+    Line
+}
+
+
+
 namespace Client
 {
     public partial class ClientForm : Form
     {
+        private Rectangle GetRectangleFromPoints(Point p1, Point p2)
+        {
+            return new Rectangle(
+                Math.Min(p1.X, p2.X),
+                Math.Min(p1.Y, p2.Y),
+                Math.Abs(p1.X - p2.X),
+                Math.Abs(p1.Y - p2.Y));
+        }
+        List<Point> currentLine = null; 
+
+        List<List<Point>> lines = new List<List<Point>>();
+
+       
         private TcpClient client;
         private NetworkStream stream;
+
+
+        private Point startPoint;    // điểm bắt đầu vẽ (MouseDown)
+        private Point lastPoint;     // điểm cuối cùng vẽ (dùng cho FreeHand hoặc vẽ)
+        private Point currentPoint;  // điểm hiện tại khi kéo chuột (MouseMove) dùng để vẽ tạm thời
         private bool isDrawing = false;
-        private Point lastPoint;
+        private DrawingMode currentMode;  // enum bạn tự định nghĩa như Line, Rectangle, Ellipse, FreeHand
+
 
         private Bitmap drawingBitmap;
         private Graphics graphics;
+
+
+        private Color previousColor = Color.Black;
 
         private Color currentColor = Color.Black;
         private int penThickness = 2;
@@ -35,6 +68,8 @@ namespace Client
         private const int MaxImageWidth = 200;
         private const int MaxImageHeight = 200;
 
+
+
         public ClientForm()
         {
             InitializeComponent();
@@ -43,7 +78,7 @@ namespace Client
             graphics = Graphics.FromImage(drawingBitmap);
             graphics.Clear(Color.White);
 
-            panelWhiteboard.BackgroundImage = drawingBitmap;
+          
             panelWhiteboard.BackgroundImageLayout = ImageLayout.None;
 
             ConnectToServer();
@@ -55,11 +90,19 @@ namespace Client
 
             panelWhiteboard.MouseDown += PanelWhiteboard_MouseDown;
             panelWhiteboard.MouseMove += PanelWhiteboard_MouseMove;
-            panelWhiteboard.MouseUp += PanelWhiteboard_MouseUp;
+            panelWhiteboard.MouseUp += panelWhiteboard_MouseUp;
 
             btnInsertImage.Click += btnInsertImage_Click;
             buttonEnd.Click += buttonEnd_Click;
             btnChooseColor.Click += btnChooseColor_Click;
+
+            comboBoxDrawMode.Items.Add("Freehand");
+            comboBoxDrawMode.Items.Add("Rectangle");
+            comboBoxDrawMode.Items.Add("Ellipse");
+            comboBoxDrawMode.Items.Add("Line");
+            comboBoxDrawMode.SelectedIndex = 0; // chọn mặc định là Freehand
+            comboBoxDrawMode.SelectedIndexChanged += ComboBoxDrawMode_SelectedIndexChanged;
+
         }
 
         private void ConnectToServer()
@@ -135,26 +178,45 @@ namespace Client
         {
             if (msg.StartsWith("DRAW"))
             {
-                string[] parts = msg.Split(';');
-                if (parts.Length != 7) return;
+                Console.WriteLine("[CLIENT] Received DRAW message: " + msg);
 
-                if (int.TryParse(parts[1], out int x1) &&
-                    int.TryParse(parts[2], out int y1) &&
-                    int.TryParse(parts[3], out int x2) &&
-                    int.TryParse(parts[4], out int y2) &&
-                    int.TryParse(parts[5], out int thickness) &&
-                    int.TryParse(parts[6], out int argb))
+                string[] parts = msg.Split(';');
+                if (parts.Length != 8) return; // cần đủ 8 phần
+
+                string shape = parts[1];
+
+                if (int.TryParse(parts[2], out int argb) &&
+                    float.TryParse(parts[3], out float thickness) &&
+                    int.TryParse(parts[4], out int x1) &&
+                    int.TryParse(parts[5], out int y1) &&
+                    int.TryParse(parts[6], out int x2) &&
+                    int.TryParse(parts[7], out int y2))
                 {
                     Color c = Color.FromArgb(argb);
+                    Point p1 = new Point(x1, y1);
+                    Point p2 = new Point(x2, y2);
+
                     this.Invoke((MethodInvoker)delegate
                     {
                         lock (drawingBitmap)
                         {
                             using (Graphics g = Graphics.FromImage(drawingBitmap))
+                            using (Pen pen = new Pen(c, thickness))
                             {
-                                using (Pen p = new Pen(c, thickness))
+                                switch (shape)
                                 {
-                                    g.DrawLine(p, x1, y1, x2, y2);
+                                    case "Line":
+                                        g.DrawLine(pen, p1, p2);
+                                        break;
+                                    case "Rectangle":
+                                        g.DrawRectangle(pen, GetRectangleFromPoints(p1, p2));
+                                        break;
+                                    case "Ellipse":
+                                        g.DrawEllipse(pen, GetRectangleFromPoints(p1, p2));
+                                        break;
+                                    case "FreeHand":
+                                        g.DrawLine(pen, p1, p2); // Mỗi đoạn vẽ tay là một line nhỏ
+                                        break;
                                 }
                             }
                             panelWhiteboard.Invalidate();
@@ -221,6 +283,9 @@ namespace Client
             }
         }
 
+
+
+
         private void PanelWhiteboard_MouseDown(object sender, MouseEventArgs e)
         {
             if (IsNearResizeHandle(e.Location))
@@ -234,12 +299,16 @@ namespace Client
                 mouseDownPos = e.Location;
                 imageMoveStartPos = new Point(currentImageRect.X, currentImageRect.Y);
             }
-            else
+            else if (e.Button == MouseButtons.Left)
             {
                 isDrawing = true;
-                lastPoint = e.Location;
+                startPoint = e.Location;   // điểm bắt đầu vẽ cho các kiểu
+                lastPoint = e.Location;    // dùng cho vẽ FreeHand
+                currentPoint = e.Location; // cập nhật điểm hiện tại cho vẽ tạm thời
             }
         }
+
+
 
         private string GetPicturesFolderPath()
         {
@@ -323,7 +392,33 @@ namespace Client
 
         private void PanelWhiteboard_MouseMove(object sender, MouseEventArgs e)
         {
-            if (isResizingImage)
+            if (isDrawing)
+            {
+                if (currentMode == DrawingMode.FreeHand)
+                {
+                    using (Graphics g = Graphics.FromImage(drawingBitmap))
+                    {
+                        using (Pen pen = new Pen(currentColor, penThickness))
+                        {
+                            g.DrawLine(pen, lastPoint, e.Location);
+                        }
+                    }
+
+                    // Gửi dữ liệu đoạn line vừa vẽ để đồng bộ
+                    SendDrawCommand("FreeHand", lastPoint, e.Location, currentColor, penThickness);
+
+                    lastPoint = e.Location;
+                    panelWhiteboard.Invalidate();
+                }
+                else
+                {
+                    // Cập nhật điểm hiện tại để vẽ tạm thời trong Paint event
+                    currentPoint = e.Location;
+                    panelWhiteboard.Invalidate();
+                }
+            }
+            // phần resize/move ảnh không thay đổi
+            else if (isResizingImage)
             {
                 int dx = e.X - resizeStartPos.X;
                 int dy = e.Y - resizeStartPos.Y;
@@ -340,40 +435,54 @@ namespace Client
                 currentImageRect.Y = imageMoveStartPos.Y + dy;
                 RedrawWhiteboard();
             }
-            else if (isDrawing)
+        }
+
+
+
+        private void SendDrawCommand(string shape, Point start, Point end, Color color, float thickness)
+        {
+            string message = $"DRAW;{shape};{color.ToArgb()};{thickness};{start.X};{start.Y};{end.X};{end.Y}";
+            SendMessage(message);
+        }
+
+
+        private void panelWhiteboard_MouseUp(object sender, MouseEventArgs e)
+        {
+            if (isDrawing)
             {
-                using (Graphics g = Graphics.FromImage(drawingBitmap))
+                isDrawing = false;
+
+                if (currentMode != DrawingMode.FreeHand)
                 {
-                    Color drawColor = chkEraser.Checked ? Color.White : currentColor;
-                    using (Pen pen = new Pen(drawColor, penThickness))
+                    using (Graphics g = Graphics.FromImage(drawingBitmap))
                     {
-                        g.DrawLine(pen, lastPoint, e.Location);
+                        Pen pen = new Pen(currentColor, penThickness);
+
+                        switch (currentMode)
+                        {
+                            case DrawingMode.Line:
+                                g.DrawLine(pen, startPoint, e.Location);
+                                break;
+                            case DrawingMode.Rectangle:
+                                g.DrawRectangle(pen, GetRectangleFromPoints(startPoint, e.Location));
+                                break;
+                            case DrawingMode.Ellipse:
+                                g.DrawEllipse(pen, GetRectangleFromPoints(startPoint, e.Location));
+                                break;
+                        }
                     }
 
-                    SendMessage($"DRAW;{lastPoint.X};{lastPoint.Y};{e.X};{e.Y};{penThickness};{drawColor.ToArgb()}");
-
-
-                    lastPoint = e.Location;
+                    // gửi hình vẽ đến server
+                    SendDrawCommand(currentMode.ToString(), startPoint, e.Location, currentColor, penThickness);
                     panelWhiteboard.Invalidate();
                 }
             }
-        }
-        
 
-        private void PanelWhiteboard_MouseUp(object sender, MouseEventArgs e)
-        {
-            if (isDrawing) isDrawing = false;
-            if (isMovingImage)
-            {
-                isMovingImage = false;
-                SendCurrentImagePosition();
-            }
-            if (isResizingImage)
-            {
-                isResizingImage = false;
-                SendCurrentImagePosition();
-            }
+            isResizingImage = false;
+            isMovingImage = false;
         }
+
+
 
         private bool IsNearResizeHandle(Point pt)
         {
@@ -442,6 +551,8 @@ namespace Client
             lock (drawingBitmap)
             {
                 graphics.Clear(Color.White);
+                graphics.DrawImage(drawingBitmap, 0, 0);
+
                 if (currentImage != null && currentImageRect != Rectangle.Empty)
                 {
                     graphics.DrawImage(currentImage, currentImageRect);
@@ -453,6 +564,8 @@ namespace Client
             }
             panelWhiteboard.Invalidate();
         }
+
+
 
         private void SendCurrentImagePosition()
         {
@@ -536,6 +649,103 @@ namespace Client
                 penThickness--;
                 numericUpDownThickness.Value = penThickness;  // Cập nhật thanh số, đồng thời gọi event ValueChanged
             }
+        }
+
+        private void panelWhiteboard_Paint(object sender, PaintEventArgs e)
+        {
+            lock (drawingBitmap)
+            {
+                e.Graphics.Clear(Color.White);
+                e.Graphics.DrawImageUnscaled(drawingBitmap, Point.Empty);
+
+                if (isDrawing && currentMode != DrawingMode.FreeHand)
+                {
+                    using (Pen pen = new Pen(currentColor, penThickness))
+                    {
+                        Rectangle rect = GetRectangleFromPoints(startPoint, currentPoint);
+                        switch (currentMode)
+                        {
+                            case DrawingMode.Line:
+                                e.Graphics.DrawLine(pen, startPoint, currentPoint);
+                                break;
+                            case DrawingMode.Rectangle:
+                                e.Graphics.DrawRectangle(pen, rect);
+                                break;
+                            case DrawingMode.Ellipse:
+                                e.Graphics.DrawEllipse(pen, rect);
+                                break;
+                        }
+                    }
+                }
+
+                // Vẽ ảnh nếu có
+                if (currentImage != null && currentImageRect != Rectangle.Empty)
+                {
+                    e.Graphics.DrawImage(currentImage, currentImageRect);
+                    e.Graphics.FillRectangle(Brushes.Gray,
+                        currentImageRect.Right - resizeHandleSize,
+                        currentImageRect.Bottom - resizeHandleSize,
+                        resizeHandleSize, resizeHandleSize);
+                }
+            }
+        }
+
+
+
+
+        private void ClientForm_Load(object sender, EventArgs e)
+        {
+            comboBoxDrawMode.Items.Clear(); // XÓA TẤT CẢ TRƯỚC KHI THÊM MỚI
+
+            comboBoxDrawMode.Items.Add("FreeHand");
+            comboBoxDrawMode.Items.Add("Line");
+            comboBoxDrawMode.Items.Add("Rectangle");
+            comboBoxDrawMode.Items.Add("Ellipse");
+
+            comboBoxDrawMode.SelectedIndex = 0; // Chọn mục đầu tiên mặc định
+
+            panelWhiteboard.Paint += panelWhiteboard_Paint;
+        }
+
+
+        private void ComboBoxDrawMode_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            string selectedMode = comboBoxDrawMode.SelectedItem.ToString();
+
+            switch (selectedMode)
+            {
+                case "FreeHand":
+                    currentMode = DrawingMode.FreeHand;
+                    break;
+                case "Line":
+                    currentMode = DrawingMode.Line;
+                    break;
+                case "Rectangle":
+                    currentMode = DrawingMode.Rectangle;
+                    break;
+                case "Ellipse":
+                    currentMode = DrawingMode.Ellipse;
+                    break;
+                default:
+                    currentMode = DrawingMode.FreeHand;
+                    break;
+            }
+        }
+
+
+        private void chkEraser_CheckedChanged(object sender, EventArgs e)
+        {
+            if (chkEraser.Checked)
+            {
+                previousColor = currentColor;  // Lưu màu hiện tại
+                currentColor = Color.White;    // Màu nền để tẩy
+                currentMode = DrawingMode.FreeHand; // Chuyển sang chế độ vẽ FreeHand
+            }
+            else
+            {
+                // Quay về màu vẽ bình thường, ví dụ màu đã chọn trước đó (có thể lưu trong biến khác)
+                currentColor = previousColor; // biến lưu màu trước khi bật eraser
+            }   
         }
     }
 }

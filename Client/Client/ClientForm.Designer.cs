@@ -39,6 +39,7 @@
             this.chkEraser = new System.Windows.Forms.CheckBox();
             this.btnIncreaseThickness = new System.Windows.Forms.Button();
             this.btnDecreaseThickness = new System.Windows.Forms.Button();
+            this.comboBoxDrawMode = new System.Windows.Forms.ComboBox();
             ((System.ComponentModel.ISupportInitialize)(this.numericUpDownThickness)).BeginInit();
             this.SuspendLayout();
             // 
@@ -95,9 +96,9 @@
             // 
             this.btnInsertImage.Font = new System.Drawing.Font("Segoe UI Black", 10.8F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.btnInsertImage.ForeColor = System.Drawing.Color.Navy;
-            this.btnInsertImage.Location = new System.Drawing.Point(665, 451);
+            this.btnInsertImage.Location = new System.Drawing.Point(650, 451);
             this.btnInsertImage.Name = "btnInsertImage";
-            this.btnInsertImage.Size = new System.Drawing.Size(84, 39);
+            this.btnInsertImage.Size = new System.Drawing.Size(99, 39);
             this.btnInsertImage.TabIndex = 7;
             this.btnInsertImage.Text = "INSERT";
             this.btnInsertImage.UseVisualStyleBackColor = true;
@@ -128,6 +129,7 @@
             this.chkEraser.TabIndex = 9;
             this.chkEraser.Text = "Eraser";
             this.chkEraser.UseVisualStyleBackColor = false;
+            this.chkEraser.CheckedChanged += new System.EventHandler(this.chkEraser_CheckedChanged);
             // 
             // btnIncreaseThickness
             // 
@@ -153,6 +155,20 @@
             this.btnDecreaseThickness.UseVisualStyleBackColor = true;
             this.btnDecreaseThickness.Click += new System.EventHandler(this.btnDecreaseThickness_Click);
             // 
+            // comboBoxDrawMode
+            // 
+            this.comboBoxDrawMode.FormattingEnabled = true;
+            this.comboBoxDrawMode.Items.AddRange(new object[] {
+            "Freehand",
+            "Rectangle",
+            "Ellipse",
+            "Line"});
+            this.comboBoxDrawMode.Location = new System.Drawing.Point(582, 403);
+            this.comboBoxDrawMode.Name = "comboBoxDrawMode";
+            this.comboBoxDrawMode.Size = new System.Drawing.Size(97, 24);
+            this.comboBoxDrawMode.TabIndex = 12;
+            this.comboBoxDrawMode.SelectedIndexChanged += new System.EventHandler(this.ComboBoxDrawMode_SelectedIndexChanged);
+            // 
             // ClientForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
@@ -160,6 +176,7 @@
             this.BackgroundImage = ((System.Drawing.Image)(resources.GetObject("$this.BackgroundImage")));
             this.BackgroundImageLayout = System.Windows.Forms.ImageLayout.Stretch;
             this.ClientSize = new System.Drawing.Size(886, 508);
+            this.Controls.Add(this.comboBoxDrawMode);
             this.Controls.Add(this.btnDecreaseThickness);
             this.Controls.Add(this.btnIncreaseThickness);
             this.Controls.Add(this.chkEraser);
@@ -173,6 +190,7 @@
             this.DoubleBuffered = true;
             this.Name = "ClientForm";
             this.Text = "DrawingPannel";
+            this.Load += new System.EventHandler(this.ClientForm_Load);
             ((System.ComponentModel.ISupportInitialize)(this.numericUpDownThickness)).EndInit();
             this.ResumeLayout(false);
             this.PerformLayout();
@@ -191,6 +209,7 @@
         private System.Windows.Forms.CheckBox chkEraser;
         private System.Windows.Forms.Button btnIncreaseThickness;
         private System.Windows.Forms.Button btnDecreaseThickness;
+        private System.Windows.Forms.ComboBox comboBoxDrawMode;
     }
 }
 
