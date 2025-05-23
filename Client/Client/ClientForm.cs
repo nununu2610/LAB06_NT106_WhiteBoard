@@ -17,8 +17,6 @@ enum DrawingMode
     Line
 }
 
-
-
 namespace Client
 {
     public partial class ClientForm : Form
@@ -32,15 +30,12 @@ namespace Client
                 Math.Abs(p1.Y - p2.Y));
         }
         List<Point> currentLine = null; 
-
         List<List<Point>> lines = new List<List<Point>>();
 
         private DateTime lastSendTime = DateTime.MinValue;
 
-
         private TcpClient client;
         private NetworkStream stream;
-
 
         private Point startPoint;    // điểm bắt đầu vẽ (MouseDown)
         private Point lastPoint;     // điểm cuối cùng vẽ (dùng cho FreeHand hoặc vẽ)
@@ -48,10 +43,8 @@ namespace Client
         private bool isDrawing = false;
         private DrawingMode currentMode;  // enum bạn tự định nghĩa như Line, Rectangle, Ellipse, FreeHand
 
-
         private Bitmap drawingBitmap;
         private Graphics graphics;
-
 
         private Color previousColor = Color.Black;
 
@@ -69,8 +62,6 @@ namespace Client
         private const int resizeHandleSize = 10;
         private const int MaxImageWidth = 200;
         private const int MaxImageHeight = 200;
-
-
 
         public ClientForm()
         {
@@ -106,7 +97,6 @@ namespace Client
             comboBoxDrawMode.SelectedIndexChanged += ComboBoxDrawMode_SelectedIndexChanged;
 
         }
-
         private void SendCurrentImagePositionThrottled()
         {
             var now = DateTime.Now;
@@ -133,7 +123,6 @@ namespace Client
                 Environment.Exit(0);
             }
         }
-
         private void ListenData()
         {
             byte[] buffer = new byte[4096];
@@ -184,7 +173,6 @@ namespace Client
                 Application.Exit();
             });
         }
-
         private void ProcessDrawingMessage(string msg)
         {
             if (msg.StartsWith("DRAW"))
@@ -192,7 +180,7 @@ namespace Client
                 Console.WriteLine("[CLIENT] Received DRAW message: " + msg);
 
                 string[] parts = msg.Split(';');
-                if (parts.Length != 8) return; // cần đủ 8 phần
+                if (parts.Length != 8) return; 
 
                 string shape = parts[1];
 
@@ -226,7 +214,7 @@ namespace Client
                                         g.DrawEllipse(pen, GetRectangleFromPoints(p1, p2));
                                         break;
                                     case "FreeHand":
-                                        g.DrawLine(pen, p1, p2); // Mỗi đoạn vẽ tay là một line nhỏ
+                                        g.DrawLine(pen, p1, p2); 
                                         break;
                                 }
                             }
@@ -257,14 +245,12 @@ namespace Client
                             {
                                 lock (drawingBitmap)
                                 {
-                                    // Cập nhật biến vị trí ảnh hiện tại
                                     currentImage = img; // cập nhật ảnh gốc
-                                    currentImageRect = new Rectangle(x, y, w, h); // cập nhật vị trí + kích thước
+                                    currentImageRect = new Rectangle(x, y, w, h); // cập nhật vị trí & kích thước
 
                                     using (Graphics g = Graphics.FromImage(drawingBitmap))
                                     {
-                                        RedrawWhiteboard();  // nếu bạn có hàm này để vẽ lại toàn bộ
-                                                             // Hoặc chỉ vẽ ảnh:
+                                        RedrawWhiteboard();                                                          
                                         g.DrawImage(currentImage, currentImageRect);
                                     }
                                     panelWhiteboard.Invalidate();
@@ -279,7 +265,6 @@ namespace Client
                 }
             }
         }
-
         private void SendMessage(string msg)
         {
             try
@@ -300,10 +285,6 @@ namespace Client
                 Console.WriteLine("Send error: " + ex.Message);
             }
         }
-
-
-
-
         private void PanelWhiteboard_MouseDown(object sender, MouseEventArgs e)
         {
             if (IsNearResizeHandle(e.Location))
@@ -325,24 +306,18 @@ namespace Client
                 currentPoint = e.Location; // cập nhật điểm hiện tại cho vẽ tạm thời
             }
         }
-
-
-
         private string GetPicturesFolderPath()
         {
             try
             {
-                // Lấy đường dẫn file thực thi (Client.exe)
                 string exePath = System.Reflection.Assembly.GetExecutingAssembly().Location;
 
-                // Lấy thư mục chứa file exe (D:\LAB06_NT106_WhiteBoard\Client\Client\bin\Debug\)
                 string exeDirectory = Path.GetDirectoryName(exePath);
 
-                // Đi lên 4 cấp thư mục để ra thư mục LAB06_NT106_WhiteBoard
-                DirectoryInfo dir = Directory.GetParent(exeDirectory); // bin\Debug
-                dir = Directory.GetParent(dir.FullName); // Client
-                dir = Directory.GetParent(dir.FullName); // Client
-                dir = Directory.GetParent(dir.FullName); // LAB06_NT106_WhiteBoard
+                DirectoryInfo dir = Directory.GetParent(exeDirectory); 
+                dir = Directory.GetParent(dir.FullName); 
+                dir = Directory.GetParent(dir.FullName);
+                dir = Directory.GetParent(dir.FullName); 
 
                 if (dir == null)
                     throw new Exception("Không tìm thấy thư mục gốc dự án");
@@ -364,8 +339,6 @@ namespace Client
                 return Application.StartupPath;
             }
         }
-
-
         private void SaveWhiteboardImage()
         {
             try
@@ -378,7 +351,6 @@ namespace Client
                     Directory.CreateDirectory(picturesPath);
                 }
 
-                // Tạo tên file với timestamp
                 string fileName = $"Whiteboard_{DateTime.Now:yyyyMMdd_HHmmss}.png";
                 string fullPath = Path.Combine(picturesPath, fileName);
 
@@ -406,8 +378,6 @@ namespace Client
                                 MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
-
-
         private void PanelWhiteboard_MouseMove(object sender, MouseEventArgs e)
         {
             if (isDrawing)
@@ -422,7 +392,6 @@ namespace Client
                         }
                     }
 
-                    // Gửi dữ liệu đoạn line vừa vẽ để đồng bộ
                     SendDrawCommand("FreeHand", lastPoint, e.Location, currentColor, penThickness);
 
                     lastPoint = e.Location;
@@ -430,12 +399,10 @@ namespace Client
                 }
                 else
                 {
-                    // Cập nhật điểm hiện tại để vẽ tạm thời trong Paint event
                     currentPoint = e.Location;
                     panelWhiteboard.Invalidate();
                 }
             }
-            // phần resize/move ảnh không thay đổi
             else if (isResizingImage)
             {
                 int dx = e.X - resizeStartPos.X;
@@ -444,9 +411,6 @@ namespace Client
                 currentImageRect.Height = Math.Max(20, currentImageRect.Height + dy);
                 resizeStartPos = e.Location;
                 RedrawWhiteboard();
-
-                // Không gửi message khi đang kéo
-                // SendCurrentImagePositionThrottled();  <-- Bỏ dòng này đi
             }
             else if (isMovingImage)
             {
@@ -455,21 +419,15 @@ namespace Client
                 currentImageRect.X = imageMoveStartPos.X + dx;
                 currentImageRect.Y = imageMoveStartPos.Y + dy;
                 RedrawWhiteboard();
-
-                // Không gửi message khi đang kéo
-                // SendCurrentImagePositionThrottled();  <-- Bỏ dòng này đi
             }
 
         }
-
-
 
         private void SendDrawCommand(string shape, Point start, Point end, Color color, float thickness)
         {
             string message = $"DRAW;{shape};{color.ToArgb()};{thickness};{start.X};{start.Y};{end.X};{end.Y}";
             SendMessage(message);
         }
-
         private void panelWhiteboard_MouseUp(object sender, MouseEventArgs e)
         {
             if (isDrawing)
@@ -508,9 +466,6 @@ namespace Client
             isResizingImage = false;
             isMovingImage = false;
         }
-
-
-
         private bool IsNearResizeHandle(Point pt)
         {
             Rectangle handle = new Rectangle(
@@ -592,8 +547,6 @@ namespace Client
             panelWhiteboard.Invalidate();
         }
 
-
-
         private void SendCurrentImagePosition()
         {
             if (currentImage == null || currentImageRect == Rectangle.Empty) return;
@@ -603,7 +556,6 @@ namespace Client
                 string base64;
                 using (MemoryStream ms = new MemoryStream())
                 {
-                    // Chỉ lưu phần ảnh gốc, không lưu cả bitmap đã vẽ
                     if (currentImage is Bitmap bmp)
                     {
                         bmp.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
@@ -626,7 +578,6 @@ namespace Client
                 Console.WriteLine("Error sending image: " + ex.Message);
             }
         }
-
         private void NumericUpDownThickness_ValueChanged(object sender, EventArgs e)
         {
             penThickness = (int)numericUpDownThickness.Value;
@@ -643,10 +594,8 @@ namespace Client
 
         private void buttonEnd_Click(object sender, EventArgs e)
         {
-            // Lưu ảnh trước khi thoát
             SaveWhiteboardImage();
 
-            // Đóng kết nối và ứng dụng
             try
             {
                 if (client != null && client.Connected)
@@ -665,7 +614,7 @@ namespace Client
             if (penThickness < numericUpDownThickness.Maximum)
             {
                 penThickness++;
-                numericUpDownThickness.Value = penThickness;  // Cập nhật thanh số, đồng thời gọi event ValueChanged
+                numericUpDownThickness.Value = penThickness;  
             }
         }
 
@@ -674,7 +623,7 @@ namespace Client
             if (penThickness > numericUpDownThickness.Minimum)
             {
                 penThickness--;
-                numericUpDownThickness.Value = penThickness;  // Cập nhật thanh số, đồng thời gọi event ValueChanged
+                numericUpDownThickness.Value = penThickness;  
             }
         }
 
@@ -705,7 +654,6 @@ namespace Client
                     }
                 }
 
-                // Vẽ ảnh nếu có
                 if (currentImage != null && currentImageRect != Rectangle.Empty)
                 {
                     e.Graphics.DrawImage(currentImage, currentImageRect);
@@ -716,24 +664,19 @@ namespace Client
                 }
             }
         }
-
-
-
-
         private void ClientForm_Load(object sender, EventArgs e)
         {
-            comboBoxDrawMode.Items.Clear(); // XÓA TẤT CẢ TRƯỚC KHI THÊM MỚI
+            comboBoxDrawMode.Items.Clear();
 
             comboBoxDrawMode.Items.Add("FreeHand");
             comboBoxDrawMode.Items.Add("Line");
             comboBoxDrawMode.Items.Add("Rectangle");
             comboBoxDrawMode.Items.Add("Ellipse");
 
-            comboBoxDrawMode.SelectedIndex = 0; // Chọn mục đầu tiên mặc định
+            comboBoxDrawMode.SelectedIndex = 0;
 
             panelWhiteboard.Paint += panelWhiteboard_Paint;
         }
-
 
         private void ComboBoxDrawMode_SelectedIndexChanged(object sender, EventArgs e)
         {
@@ -759,19 +702,17 @@ namespace Client
             }
         }
 
-
         private void chkEraser_CheckedChanged(object sender, EventArgs e)
         {
             if (chkEraser.Checked)
             {
-                previousColor = currentColor;  // Lưu màu hiện tại
-                currentColor = Color.White;    // Màu nền để tẩy
-                currentMode = DrawingMode.FreeHand; // Chuyển sang chế độ vẽ FreeHand
+                previousColor = currentColor;  
+                currentColor = Color.White;   
+                currentMode = DrawingMode.FreeHand; 
             }
             else
             {
-                // Quay về màu vẽ bình thường, ví dụ màu đã chọn trước đó (có thể lưu trong biến khác)
-                currentColor = previousColor; // biến lưu màu trước khi bật eraser
+                currentColor = previousColor; 
             }   
         }
     }
