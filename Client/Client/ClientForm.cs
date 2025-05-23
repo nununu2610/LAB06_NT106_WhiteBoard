@@ -35,7 +35,9 @@ namespace Client
 
         List<List<Point>> lines = new List<List<Point>>();
 
-       
+        private DateTime lastSendTime = DateTime.MinValue;
+
+
         private TcpClient client;
         private NetworkStream stream;
 
@@ -105,6 +107,15 @@ namespace Client
 
         }
 
+        private void SendCurrentImagePositionThrottled()
+        {
+            var now = DateTime.Now;
+            if ((now - lastSendTime).TotalMilliseconds > 50) // cách nhau ít nhất 50ms (20 lần/s)
+            {
+                SendCurrentImagePosition();
+                lastSendTime = now;
+            }
+        }
         private void ConnectToServer()
         {
             try
@@ -241,13 +252,20 @@ namespace Client
                         using (MemoryStream ms = new MemoryStream(imgBytes))
                         {
                             Image img = Image.FromStream(ms);
+
                             this.Invoke((MethodInvoker)delegate
                             {
                                 lock (drawingBitmap)
                                 {
+                                    // Cập nhật biến vị trí ảnh hiện tại
+                                    currentImage = img; // cập nhật ảnh gốc
+                                    currentImageRect = new Rectangle(x, y, w, h); // cập nhật vị trí + kích thước
+
                                     using (Graphics g = Graphics.FromImage(drawingBitmap))
                                     {
-                                        g.DrawImage(img, new Rectangle(x, y, w, h));
+                                        RedrawWhiteboard();  // nếu bạn có hàm này để vẽ lại toàn bộ
+                                                             // Hoặc chỉ vẽ ảnh:
+                                        g.DrawImage(currentImage, currentImageRect);
                                     }
                                     panelWhiteboard.Invalidate();
                                 }
@@ -426,6 +444,9 @@ namespace Client
                 currentImageRect.Height = Math.Max(20, currentImageRect.Height + dy);
                 resizeStartPos = e.Location;
                 RedrawWhiteboard();
+
+                // Không gửi message khi đang kéo
+                // SendCurrentImagePositionThrottled();  <-- Bỏ dòng này đi
             }
             else if (isMovingImage)
             {
@@ -434,7 +455,11 @@ namespace Client
                 currentImageRect.X = imageMoveStartPos.X + dx;
                 currentImageRect.Y = imageMoveStartPos.Y + dy;
                 RedrawWhiteboard();
+
+                // Không gửi message khi đang kéo
+                // SendCurrentImagePositionThrottled();  <-- Bỏ dòng này đi
             }
+
         }
 
 
@@ -445,7 +470,6 @@ namespace Client
             SendMessage(message);
         }
 
-
         private void panelWhiteboard_MouseUp(object sender, MouseEventArgs e)
         {
             if (isDrawing)
@@ -455,9 +479,8 @@ namespace Client
                 if (currentMode != DrawingMode.FreeHand)
                 {
                     using (Graphics g = Graphics.FromImage(drawingBitmap))
+                    using (Pen pen = new Pen(currentColor, penThickness))
                     {
-                        Pen pen = new Pen(currentColor, penThickness);
-
                         switch (currentMode)
                         {
                             case DrawingMode.Line:
@@ -472,10 +495,14 @@ namespace Client
                         }
                     }
 
-                    // gửi hình vẽ đến server
                     SendDrawCommand(currentMode.ToString(), startPoint, e.Location, currentColor, penThickness);
                     panelWhiteboard.Invalidate();
                 }
+            }
+
+            if (isResizingImage || isMovingImage)
+            {
+                SendCurrentImagePosition();
             }
 
             isResizingImage = false;
