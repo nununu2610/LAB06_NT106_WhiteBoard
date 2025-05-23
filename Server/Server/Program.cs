@@ -71,51 +71,65 @@ class Server
         {
             while (true)
             {
-                int bytesRead = stream.Read(buffer, 0, buffer.Length);
-                if (bytesRead == 0) break; // client ngắt kết nối
-
-                string chunk = Encoding.UTF8.GetString(buffer, 0, bytesRead);
-                sb.Append(chunk);
-
-                string allData = sb.ToString();
-                int newlineIndex;
-                while ((newlineIndex = allData.IndexOf('\n')) >= 0)
+                // Thêm timeout cho Read
+                if (stream.DataAvailable)
                 {
-                    string message = allData.Substring(0, newlineIndex).Trim();
-                    if (!string.IsNullOrEmpty(message))
+                    int bytesRead = stream.Read(buffer, 0, buffer.Length);
+                    if (bytesRead == 0) break;
+
+                    string chunk = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+                    sb.Append(chunk);
+
+                    string allData = sb.ToString();
+                    int newlineIndex;
+                    while ((newlineIndex = allData.IndexOf('\n')) >= 0)
                     {
-                        Console.WriteLine("Received: " + message);
-
-                        lock (_lock)
+                        string message = allData.Substring(0, newlineIndex).Trim();
+                        if (!string.IsNullOrEmpty(message))
                         {
-                            // Lưu lại lịch sử (chỉ DRAW và IMAGE)
-                            if (message.StartsWith("DRAW") || message.StartsWith("IMAGE"))
-                            {
-                                whiteboardHistory.Add(message);
-                            }
-                        }
+                            Console.WriteLine("Received: " + message);
 
-                        // Phát lại message cho các client khác
-                        Broadcast(message, client);
+                            lock (_lock)
+                            {
+                                if (message.StartsWith("DRAW") || message.StartsWith("IMAGE"))
+                                {
+                                    whiteboardHistory.Add(message);
+                                }
+                            }
+
+                            Broadcast(message, client);
+                        }
+                        allData = allData.Substring(newlineIndex + 1);
                     }
-                    allData = allData.Substring(newlineIndex + 1);
+                    sb.Clear();
+                    sb.Append(allData);
                 }
-                sb.Clear();
-                sb.Append(allData);
+                Thread.Sleep(10); // Giảm CPU usage
             }
+        }
+        catch (IOException ex)
+        {
+            Console.WriteLine("Client disconnected (IO): " + ex.Message);
+        }
+        catch (SocketException ex)
+        {
+            Console.WriteLine("Client disconnected (Socket): " + ex.Message);
         }
         catch (Exception ex)
         {
-            Console.WriteLine("Client disconnected: " + ex.Message);
+            Console.WriteLine("Client error: " + ex.Message);
         }
         finally
         {
             lock (_lock)
             {
-                clients.Remove(client);
-                Console.WriteLine("Client disconnected. Total clients: " + clients.Count);
+                if (clients.Contains(client))
+                {
+                    clients.Remove(client);
+                    Console.WriteLine("Client disconnected. Total clients: " + clients.Count);
+                }
             }
-            client.Close();
+            try { client.Close(); } catch { }
         }
     }
 

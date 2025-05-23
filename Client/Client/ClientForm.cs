@@ -85,40 +85,50 @@ namespace Client
             byte[] buffer = new byte[4096];
             StringBuilder sb = new StringBuilder();
 
-            while (true)
+            while (client != null && client.Connected)
             {
                 try
                 {
-                    int bytesRead = stream.Read(buffer, 0, buffer.Length);
-                    if (bytesRead == 0) break;
-
-                    string chunk = Encoding.UTF8.GetString(buffer, 0, bytesRead);
-                    sb.Append(chunk);
-
-                    string allData = sb.ToString();
-                    int newlineIndex;
-                    while ((newlineIndex = allData.IndexOf('\n')) >= 0)
+                    if (stream.DataAvailable)
                     {
-                        string line = allData.Substring(0, newlineIndex).Trim();
-                        if (line.Length > 0)
-                            ProcessDrawingMessage(line);
+                        int bytesRead = stream.Read(buffer, 0, buffer.Length);
+                        if (bytesRead == 0) break;
 
-                        allData = allData.Substring(newlineIndex + 1);
+                        string chunk = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+                        sb.Append(chunk);
+
+                        string allData = sb.ToString();
+                        int newlineIndex;
+                        while ((newlineIndex = allData.IndexOf('\n')) >= 0)
+                        {
+                            string line = allData.Substring(0, newlineIndex).Trim();
+                            if (line.Length > 0)
+                                ProcessDrawingMessage(line);
+
+                            allData = allData.Substring(newlineIndex + 1);
+                        }
+                        sb.Clear();
+                        sb.Append(allData);
                     }
-                    sb.Clear();
-                    sb.Append(allData);
+                    Thread.Sleep(10);
                 }
-                catch
+                catch (IOException ex)
                 {
+                    Console.WriteLine("IO Error: " + ex.Message);
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("Error: " + ex.Message);
                     break;
                 }
             }
 
-            this.Invoke(new Action(() =>
+            this.Invoke((MethodInvoker)delegate
             {
                 MessageBox.Show("Lost connection to server.");
                 Application.Exit();
-            }));
+            });
         }
 
         private void ProcessDrawingMessage(string msg)
@@ -136,17 +146,20 @@ namespace Client
                     int.TryParse(parts[6], out int argb))
                 {
                     Color c = Color.FromArgb(argb);
-                    lock (drawingBitmap)
+                    this.Invoke((MethodInvoker)delegate
                     {
-                        using (Graphics g = Graphics.FromImage(drawingBitmap))
+                        lock (drawingBitmap)
                         {
-                            using (Pen p = new Pen(c, thickness))
+                            using (Graphics g = Graphics.FromImage(drawingBitmap))
                             {
-                                g.DrawLine(p, x1, y1, x2, y2);
+                                using (Pen p = new Pen(c, thickness))
+                                {
+                                    g.DrawLine(p, x1, y1, x2, y2);
+                                }
                             }
+                            panelWhiteboard.Invalidate();
                         }
-                    }
-                    panelWhiteboard.Invoke(new Action(() => panelWhiteboard.Invalidate()));
+                    });
                 }
             }
             else if (msg.StartsWith("IMAGE"))
@@ -159,24 +172,30 @@ namespace Client
                     int.TryParse(parts[3], out int w) &&
                     int.TryParse(parts[4], out int h))
                 {
-                    string base64Image = msg.Substring(msg.IndexOf(parts[5]));
+                    string base64Image = parts[5];
                     try
                     {
                         byte[] imgBytes = Convert.FromBase64String(base64Image);
                         using (MemoryStream ms = new MemoryStream(imgBytes))
                         {
                             Image img = Image.FromStream(ms);
-                            lock (drawingBitmap)
+                            this.Invoke((MethodInvoker)delegate
                             {
-                                using (Graphics g = Graphics.FromImage(drawingBitmap))
+                                lock (drawingBitmap)
                                 {
-                                    g.DrawImage(img, new Rectangle(x, y, w, h));
+                                    using (Graphics g = Graphics.FromImage(drawingBitmap))
+                                    {
+                                        g.DrawImage(img, new Rectangle(x, y, w, h));
+                                    }
+                                    panelWhiteboard.Invalidate();
                                 }
-                            }
-                            panelWhiteboard.Invoke(new Action(() => panelWhiteboard.Invalidate()));
+                            });
                         }
                     }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine("Error processing image: " + ex.Message);
+                    }
                 }
             }
         }
@@ -185,14 +204,21 @@ namespace Client
         {
             try
             {
-                if (stream != null && stream.CanWrite)
+                if (client != null && client.Connected && stream != null && stream.CanWrite)
                 {
                     byte[] data = Encoding.UTF8.GetBytes(msg + "\n");
                     stream.Write(data, 0, data.Length);
                     stream.Flush();
                 }
+                else
+                {
+                    Console.WriteLine("Cannot send - connection not available");
+                }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Send error: " + ex.Message);
+            }
         }
 
         private void PanelWhiteboard_MouseDown(object sender, MouseEventArgs e)
@@ -214,6 +240,86 @@ namespace Client
                 lastPoint = e.Location;
             }
         }
+
+        private string GetPicturesFolderPath()
+        {
+            try
+            {
+                // Lấy đường dẫn file thực thi (Client.exe)
+                string exePath = System.Reflection.Assembly.GetExecutingAssembly().Location;
+
+                // Lấy thư mục chứa file exe (D:\LAB06_NT106_WhiteBoard\Client\Client\bin\Debug\)
+                string exeDirectory = Path.GetDirectoryName(exePath);
+
+                // Đi lên 4 cấp thư mục để ra thư mục LAB06_NT106_WhiteBoard
+                DirectoryInfo dir = Directory.GetParent(exeDirectory); // bin\Debug
+                dir = Directory.GetParent(dir.FullName); // Client
+                dir = Directory.GetParent(dir.FullName); // Client
+                dir = Directory.GetParent(dir.FullName); // LAB06_NT106_WhiteBoard
+
+                if (dir == null)
+                    throw new Exception("Không tìm thấy thư mục gốc dự án");
+
+                // Kết hợp với thư mục Pictures
+                string picturesPath = Path.Combine(dir.FullName, "Pictures");
+
+                // Tạo thư mục nếu chưa tồn tại
+                if (!Directory.Exists(picturesPath))
+                {
+                    Directory.CreateDirectory(picturesPath);
+                }
+
+                return picturesPath;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Lỗi khi xác định thư mục lưu ảnh: {ex.Message}\nẢnh sẽ được lưu vào thư mục ứng dụng");
+                return Application.StartupPath;
+            }
+        }
+
+
+        private void SaveWhiteboardImage()
+        {
+            try
+            {
+                string picturesPath = GetPicturesFolderPath();
+
+                // Đảm bảo thư mục tồn tại
+                if (!Directory.Exists(picturesPath))
+                {
+                    Directory.CreateDirectory(picturesPath);
+                }
+
+                // Tạo tên file với timestamp
+                string fileName = $"Whiteboard_{DateTime.Now:yyyyMMdd_HHmmss}.png";
+                string fullPath = Path.Combine(picturesPath, fileName);
+
+                // Lưu ảnh
+                lock (drawingBitmap)
+                {
+                    drawingBitmap.Save(fullPath, System.Drawing.Imaging.ImageFormat.Png);
+                }
+
+                // Hiển thị thông báo
+                MessageBox.Show($"Đã lưu ảnh thành công tại:\n{fullPath}", "Thông báo",
+                               MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+                // Mở thư mục chứa ảnh
+                System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{fullPath}\"");
+            }
+            catch (UnauthorizedAccessException)
+            {
+                MessageBox.Show("Lỗi: Không có quyền truy cập thư mục đích.", "Lỗi",
+                                MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Lỗi khi lưu ảnh:\n{ex.Message}", "Lỗi",
+                                MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
 
         private void PanelWhiteboard_MouseMove(object sender, MouseEventArgs e)
         {
@@ -346,18 +452,34 @@ namespace Client
         private void SendCurrentImagePosition()
         {
             if (currentImage == null || currentImageRect == Rectangle.Empty) return;
+
             try
             {
                 string base64;
                 using (MemoryStream ms = new MemoryStream())
                 {
-                    currentImage.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
+                    // Chỉ lưu phần ảnh gốc, không lưu cả bitmap đã vẽ
+                    if (currentImage is Bitmap bmp)
+                    {
+                        bmp.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
+                    }
+                    else
+                    {
+                        using (Bitmap temp = new Bitmap(currentImage))
+                        {
+                            temp.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
+                        }
+                    }
                     base64 = Convert.ToBase64String(ms.ToArray());
                 }
+
                 string msg = $"IMAGE;{currentImageRect.X};{currentImageRect.Y};{currentImageRect.Width};{currentImageRect.Height};{base64}";
                 SendMessage(msg);
             }
-            catch { }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Error sending image: " + ex.Message);
+            }
         }
 
         private void NumericUpDownThickness_ValueChanged(object sender, EventArgs e)
@@ -376,7 +498,20 @@ namespace Client
 
         private void buttonEnd_Click(object sender, EventArgs e)
         {
-            client?.Close();
+            // Lưu ảnh trước khi thoát
+            SaveWhiteboardImage();
+
+            // Đóng kết nối và ứng dụng
+            try
+            {
+                if (client != null && client.Connected)
+                {
+                    SendMessage("DISCONNECT");
+                    client.Close();
+                }
+            }
+            catch { }
+
             Application.Exit();
         }
     }
