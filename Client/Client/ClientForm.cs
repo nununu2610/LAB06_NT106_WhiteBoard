@@ -344,16 +344,21 @@ namespace Client
             {
                 using (Graphics g = Graphics.FromImage(drawingBitmap))
                 {
-                    using (Pen pen = new Pen(currentColor, penThickness))
+                    Color drawColor = chkEraser.Checked ? Color.White : currentColor;
+                    using (Pen pen = new Pen(drawColor, penThickness))
                     {
                         g.DrawLine(pen, lastPoint, e.Location);
                     }
+
+                    SendMessage($"DRAW;{lastPoint.X};{lastPoint.Y};{e.X};{e.Y};{penThickness};{drawColor.ToArgb()}");
+
+
+                    lastPoint = e.Location;
+                    panelWhiteboard.Invalidate();
                 }
-                SendMessage($"DRAW;{lastPoint.X};{lastPoint.Y};{e.X};{e.Y};{penThickness};{currentColor.ToArgb()}");
-                lastPoint = e.Location;
-                panelWhiteboard.Invalidate();
             }
         }
+        
 
         private void PanelWhiteboard_MouseUp(object sender, MouseEventArgs e)
         {
@@ -513,6 +518,24 @@ namespace Client
             catch { }
 
             Application.Exit();
+        }
+
+        private void btnIncreaseThickness_Click(object sender, EventArgs e)
+        {
+            if (penThickness < numericUpDownThickness.Maximum)
+            {
+                penThickness++;
+                numericUpDownThickness.Value = penThickness;  // Cập nhật thanh số, đồng thời gọi event ValueChanged
+            }
+        }
+
+        private void btnDecreaseThickness_Click(object sender, EventArgs e)
+        {
+            if (penThickness > numericUpDownThickness.Minimum)
+            {
+                penThickness--;
+                numericUpDownThickness.Value = penThickness;  // Cập nhật thanh số, đồng thời gọi event ValueChanged
+            }
         }
     }
 }

@@ -95,10 +95,21 @@ class Server
                                 {
                                     whiteboardHistory.Add(message);
                                 }
+                                else if (message.StartsWith("DELETE"))
+                                {
+                                    string[] parts = message.Split(';');
+                                    if (parts.Length >= 2)
+                                    {
+                                        string target = parts[1]; // e.g. DRAW;id=abc
+                                        whiteboardHistory.RemoveAll(msg => msg.Contains(target));
+                                        Console.WriteLine("Deleted from history: " + target);
+                                    }
+                                }
                             }
 
                             Broadcast(message, client);
                         }
+
                         allData = allData.Substring(newlineIndex + 1);
                     }
                     sb.Clear();
@@ -198,9 +209,9 @@ class Server
             mail.From = new MailAddress("nnhu7732@NhomNN.nt106"); // Email hợp lệ
             mail.To.Add("nnhu7732@NhomNN.nt106"); // Người nhận
             mail.Subject = "Cảnh báo: Đã có đủ 5 Client kết nối";
-            mail.Body = "Hiện tại Server đã có 5 Client đang hoạt dộng";
+            mail.Body = "Hiện tại Server đã có 5 Client đang hoạt động.";
 
-            SmtpClient smtp = new SmtpClient("192.168.102.93", 587); // port 587 thường dùng
+            SmtpClient smtp = new SmtpClient("192.168.102.106", 587); // port 587 thường dùng
             smtp.Credentials = new NetworkCredential("nnhu7732@NhomNN.nt106", "Nt106Uit@@");
             smtp.EnableSsl = true; // Nếu server hỗ trợ SSL/TLS
 
@@ -209,7 +220,7 @@ class Server
                 (sender, certificate, chain, sslPolicyErrors) => true;
 
             smtp.Send(mail);
-            Console.WriteLine("Gửi mail cảnh báo tới quản trị viên thành công");
+            Console.WriteLine("Alert message was sent to the admin successfully.");
         }
         catch (Exception ex)
         {
